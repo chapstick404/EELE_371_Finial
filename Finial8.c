@@ -64,6 +64,12 @@ char Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current
 _Bool firstpacket = 1;
 int Data_Cnt = 0;
 
+// UART and message variables
+char forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
+char reverse[] = "\n\r Motor advanced 1 step \r\n\0";
+int position = 1;
+char *message; //Memory start of message to be sent
+
 char Data_In;
 char Seconds_Recived;
 char Minutes_Recived;
@@ -88,6 +94,12 @@ void I_O_Init(void){
 
     P1SEL1 &= ~BIT2;
     P1SEL0 |= BIT2; //P1.2 = SDA
+
+    //UART Pin Setup
+    P4SEL1 &= ~BIT3;
+    P4SEL0 |= BIT3;
+    P4SEL1 &= ~BIT2;
+    P4SEL0 |= BIT2;
 }
 
 void ADC_Init(void){
@@ -130,6 +142,21 @@ void I2C_Init(void){
     UCB0CTLW0 &= ~UCSWRST; //Out of SW reset
 }
 
+void UART_init(void){
+    /*
+     * Initilize the eUSCI_A1 as UART
+     */
+    //-- Put eUSCI_A1 into reset
+    UCA1CTLW0 |= UCSWRST;
+
+    //-- Configure eUSCI_A1
+    UCA1CTLW0 |= UCSSEL__SMCLK;
+    UCA1BRW = 17;
+    UCA1MCTLW |= 0x4A00;
+
+    //-- Take eUSCI_A1 out of SW reset
+    UCA1CTLW0 &= ~UCSWRST;
+}
 void init(void){
     /* Init function
      *
@@ -228,6 +255,20 @@ __interrupt void ADC_ISR(void){
     }
 }
 
+#pragma vector = EUSCI_A1_VECTOR
+__interrupt void ISR_EUSCI_A1(void){
+    if(message[position] == '\0'){ // '\0' is the ending char so exit and stop transmitting
+        position = 1;
+        UCA1IE &= ~UCTXCPTIE; //Turn off TX interrupt because we are done
+    }
+    else{
+        UCA1TXBUF = message[position];
+        position++;
+    }
+    UCA1IFG &= ~UCTXCPTIFG;
+}
+//--End UART ISR
+
 //ISR
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_I2C_ISR(void){
@@ -264,3 +305,5 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         }
         }
 }
+
+
