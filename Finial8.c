@@ -176,7 +176,7 @@ void UART_init(void){
     UCA1CTLW0 &= ~UCSWRST;
 }
 
-void Timer_init(void)
+void Timer_Init(void)
 {
     //--Setup Timer
     TB0CTL |= TBCLR; //Clear timer and dividers
@@ -341,7 +341,106 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         if(Data_Cnt == 2){
             Minutes_Recived = Data_In;
         }
+    }
+}
+
+#pragma vector = PORT4_VECTOR
+__interrupt void ISR_Port4_S1(void){
+    //SW1 ISR
+    // TODO: prevent both interrupts from being active at the same time
+    TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
+    moveForward = 1;
+    state = 0;
+    TB0R = 0; //Clear timer count
+
+
+    //Sends forward on press
+    UCA1IE |= UCTXCPTIE;
+    message = forward; //Set the message to be sent
+    UCA1TXBUF = message[0]; //Transmit the start of the message
+
+    P4IFG &= ~BIT1;
+}
+#pragma vector = PORT2_VECTOR
+__interrupt void ISR_Port2_S2(void){
+    //SW2 ISR
+    // TODO: prevent both interrupts from being active at the same time
+    TB0EX0 = TBIDEX__1;         // make sure divider is 1
+    moveReverse = 1;
+    state = 0;
+    TB0R = 0;
+
+    //Sends reverse on press
+    UCA1IE |= UCTXCPTIE;
+    message = reverse; //Sets the message to be sent
+    UCA1TXBUF = message[0]; //Transmit the start of the message
+
+    P2IFG &= ~BIT3;
+}
+
+#pragma vector = TIMER0_B0_VECTOR
+__interrupt void ISR_TB0_CCR0(void){
+
+    //FSM controlling the order of led lighting
+    //Todo add default cases
+    if(moveForward){
+        P3OUT &= 0;
+        state++;
+        switch (state) {
+        case 1:
+            P3OUT |= BIT1;
+            break;
+
+        case 2:
+            P3OUT |= BIT2;
+            break;
+
+        case 3:
+            P3OUT |= BIT3;
+            break;
+        case 4:
+            P3OUT |= BIT0;
+            state = 0;
+            if(cycle == ForwardCycleNumber -1){ //We have reached the maximum number of cycles, time to end
+                moveForward = 0;
+                cycle = 0;
+            }
+            else{
+                cycle++;
+            }
+            break;
         }
+    }
+
+    if(moveReverse){
+        P3OUT &= 0;
+        state++;
+        switch (state) {
+        case 1:
+            P3OUT |= BIT3;
+            break;
+
+        case 2:
+            P3OUT |= BIT2;
+            break;
+
+        case 3:
+            P3OUT |= BIT1;
+            break;
+        case 4:
+            P3OUT |= BIT0;
+            state = 0;
+            if(cycle == ReverseCycleNumber -1){ //We have reached the maxium number of cylces, time to end
+                moveReverse = 0;
+                cycle = 0;
+            }
+            else{
+                cycle++;
+            }
+            break;
+        }
+    }
+    TB0CCTL0 &= ~CCIFG;
 }
 
 
