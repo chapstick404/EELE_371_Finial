@@ -103,6 +103,15 @@ void I_O_Init(void){
     LED1OUT
     LED2OUT
 
+    P3SEL0 &= ~(BIT0 | BIT1| BIT2 | BIT3);
+    P3SEL1 &= ~(BIT0 | BIT1| BIT2 | BIT3); //P3.0 - P3.3 set as I/O
+    P3DIR |= (BIT0 | BIT1| BIT2 | BIT3) ;
+    P3OUT &= ~(BIT0 | BIT1| BIT2 | BIT3);
+    P3OUT |= BIT0;
+
+    SW1wINT
+    SW2wINT
+
     P1SEL1 |= BIT4;
     P1SEL0 |= BIT4; //P1.4 for A4 (Device specific Datasheet)
 
