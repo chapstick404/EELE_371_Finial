@@ -106,7 +106,8 @@ void I_O_Init(void){
     P3SEL0 &= ~(BIT0 | BIT1| BIT2 | BIT3);
     P3SEL1 &= ~(BIT0 | BIT1| BIT2 | BIT3); //P3.0 - P3.3 set as I/O
     P3DIR |= (BIT0 | BIT1| BIT2 | BIT3) ;
-    P3OUT &= ~(BIT0 | BIT1| BIT2 | BIT3);
+    P3OUT &= ~(BIT0 | BIT1| BIT2 | BIT3);SW1wINT
+
     P3OUT |= BIT0;
 
     SW1wINT
@@ -215,6 +216,9 @@ void init(void){
 
     UCB0IE |= UCTXIE0;
     UCB0IE |= UCRXIE0;
+
+    SW1IntEn
+    SW2IntEn
 
     PM5CTL0 &= ~LOCKLPM5; // Turn on GPIO
     __enable_interrupt();
