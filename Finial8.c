@@ -170,7 +170,7 @@ void I2C_Init(void){
     UCB0CTLW0 &= ~UCSWRST; //Out of SW reset
 }
 
-void UART_init(void){
+void UART_Init(void){
     /*
      * Initialize the eUSCI_A1 as UART
      */
@@ -209,6 +209,7 @@ void init(void){
     I_O_Init();
     ADC_Init();
     I2C_Init();
+    UART_Init();
     Timer_Init();
 
     //Interrupt Enables
