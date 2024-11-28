@@ -68,8 +68,11 @@
 #define ReverseCycleNumber 128 //AntiClockwise
 
 
-char Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
-_Bool firstpacket = 1;
+char RTCPacket[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+
+_Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
+_Bool port_expander_config = 0; //If true the I2C sends the port expander config over the bus
+
 int Data_Cnt = 0;
 
 // UART and message variables
@@ -213,7 +216,9 @@ void RTC_Config(void){
     //Transmit configuration to RTC
 
     UCB0CTLW0 |= UCTR; //Transmit mode
-    UCB0TBCNT = sizeof(Packet); //number of bytes in packet
+    UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
+    UCB0TBCNT = sizeof(RTCPacket); //number of bytes in packet
+    RTC_config = 1;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}
@@ -228,6 +233,7 @@ void RTC_Recive(void){
     //Transmit Register Address to RTC
     UCB0TBCNT = 0x01; //Limit to 1 byte transmit
     UCB0CTLW0 |= UCTR; //Tx mode
+    UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){} //Waiting until the I2C controller completes
@@ -304,15 +310,15 @@ __interrupt void ISR_EUSCI_A1(void){
 //ISR
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_I2C_ISR(void){
-    if(firstpacket){
+    if(RTC_config){
         //Transmit Config Data to RTC
-        if(Data_Cnt == (sizeof(Packet)-1)){
-            UCB0TXBUF = Packet[Data_Cnt];
+        if(Data_Cnt == (sizeof(RTCPacket)-1)){
+            UCB0TXBUF = RTCPacket[Data_Cnt];
             Data_Cnt = 0;
-            firstpacket = 0;
+            RTC_config = 0;
         }
         else{
-            UCB0TXBUF = Packet[Data_Cnt];
+            UCB0TXBUF = RTCPacket[Data_Cnt];
             Data_Cnt++;
         }
         }
