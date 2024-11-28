@@ -69,11 +69,16 @@
 
 
 char RTCPacket[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+char port_expander_packet[] = {0x00, 0x00};
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool port_expander_config = 0; //If true the I2C sends the port expander config over the bus
 
+_Bool RTC_select = 0;
+_Bool Port_Expander_Select = 0;
+
 int Data_Cnt = 0;
+int value = 0;
 
 // UART and message variables
 char forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
@@ -86,6 +91,7 @@ char Seconds_Recived;
 char Minutes_Recived;
 
 int ADC_Value;
+_Bool ADC_Complete = 0;
 _Bool RTC_Recive_Flag = 0;
 
 
@@ -239,10 +245,23 @@ void RTC_Config(void){
     UCB0IFG &= ~UCSTPIFG;
 }
 
+void Port_Expander_Config(void){
+    //Transmit configuration to the port expander
+    UCB0CTLW0 |= UCTR; //Transmit mode
+    UCB0I2CSA = 0x0020; //Slave address =0x20 (Port Expander address)
+    UCB0TBCNT = sizeof(port_expander_config); //number of bytes in packet
+    port_expander_config = 1;
+    UCB0CTLW0 |= UCTXSTT; // Generate START condition
+
+    while ((UCB0IFG & UCSTPIFG) == 0){}
+    UCB0IFG &= ~UCSTPIFG;
+}
+
 void RTC_Recive(void){
     //Receive Data from RTC
 
     RTC_Recive_Flag = 0;
+    RTC_select = 1;
 
     //Transmit Register Address to RTC
     UCB0TBCNT = 0x01; //Limit to 1 byte transmit
@@ -260,13 +279,66 @@ void RTC_Recive(void){
 
     while ((UCB0IFG & UCSTPIFG) == 0){}  //Wait until I2C completes
     UCB0IFG &= ~UCSTPIFG;
+
+    RTC_select = 0;
 }
 
+void Display_Value(void){
+    Port_Expander_Select = 1;
+    Data_Cnt = 0;
+    UCB0CTLW0 |= UCTR; //Transmit mode
+    UCB0I2CSA = 0x0020; //Slave address =0x20 (Port Expander address)
+    UCB0TBCNT = 2; //number of bytes in packet
+    UCB0CTLW0 |= UCTXSTT; // Generate START condition
+
+    while ((UCB0IFG & UCSTPIFG) == 0){}
+    UCB0IFG &= ~UCSTPIFG;
+    Port_Expander_Select = 0;
+}
 void ADC_Measure(void){
     //Start the ADC measurement
+    ADC_Complete = 0;
     ADCCTL0 |= ADCENC | ADCSC; //Enable and start conversion
-    while((ADCIFG & ADCIFG0) == 0){} //Wait for conversion to finish (??? TI says it works)
+    while(ADC_Complete == 0){} //Wait for conversion to finish
 
+}
+
+int SegConvert(int num){
+    //converts an single digit number to the pins that need to be turned on for the 7 seg display
+    switch(num){
+    case 0:
+        return 63;
+        break;
+    case 1:
+        return 6;
+        break;
+    case 2:
+        return 91;
+        break;
+    case 3:
+        return 79;
+        break;
+    case 4:
+        return 102;
+        break;
+    case 5:
+        return 109;
+        break;
+    case 6:
+        return 125;
+        break;
+    case 7:
+        return 7;
+        break;
+    case 8:
+        return 127;
+        break;
+    case 9:
+        return 103;
+        break;
+
+    }
+    return 0;
 }
 
 int main(void)
@@ -275,9 +347,13 @@ int main(void)
     init();
 
     RTC_Config();
+    Port_Expander_Config();
 
     while(1){
         ADC_Measure();
+        value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
+        //Todo add algorithm to convert from voltage value to pressure and split into two vars
+        Display_Value();
         if(RTC_Recive_Flag){
             RTC_Recive();
         }
@@ -305,6 +381,7 @@ __interrupt void ADC_ISR(void){
         LED1OFF
         LED2OFF
     }
+    ADC_Complete = 1;
 }
 
 #pragma vector = EUSCI_A1_VECTOR
@@ -335,25 +412,51 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
             UCB0TXBUF = RTCPacket[Data_Cnt];
             Data_Cnt++;
         }
-        }
+    }
+
+    if(port_expander_config){
+        //Transmit Config Data to Port Expander
+            if(Data_Cnt == (sizeof(port_expander_packet)-1)){
+                UCB0TXBUF = port_expander_packet[Data_Cnt];
+                Data_Cnt = 0;
+                port_expander_config = 0;
+            }
+            else{
+                UCB0TXBUF = port_expander_packet[Data_Cnt];
+                Data_Cnt++;
+            }
+    }
+
 
     else{
-        switch(UCB0IV){
-            case 0x16:
-                Data_In = UCB0RXBUF;
+        if(RTC_select){
+            switch(UCB0IV){
+                case 0x16:
+                    Data_In = UCB0RXBUF;
+                    Data_Cnt++;
+                    break;
+                case 0x18:
+                    UCB0TXBUF = 0x03;
+                    break;
+                default:
+                    break;
+            }
+            if(Data_Cnt == 1){
+                Seconds_Recived = Data_In;
+            }
+            if(Data_Cnt == 2){
+                Minutes_Recived = Data_In;
+            }
+        }
+        if(Port_Expander_Select){
+            if(Data_Cnt == 0){
+                UCB0TXBUF = 0x12;
                 Data_Cnt++;
-                break;
-            case 0x18:
-                UCB0TXBUF = 0x03;
-                break;
-            default:
-                break;
-        }
-        if(Data_Cnt == 1){
-            Seconds_Recived = Data_In;
-        }
-        if(Data_Cnt == 2){
-            Minutes_Recived = Data_In;
+            }
+            else if(Data_Cnt == 1){
+                UCB0TXBUF = SegConvert(value);
+            }
+            //todo send 2 segs
         }
     }
 }
