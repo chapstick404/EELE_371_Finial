@@ -290,7 +290,9 @@ int main(void)
 //---ISR--
 #pragma vector=ADC_VECTOR
 __interrupt void ADC_ISR(void){
-    //Gather ADC value and compare to voltage macros
+    /*
+     * Gather ADC value and compare to voltage macros
+     */
     ADC_Value = ADCMEM0;
     if(ADC_Value - OFFSET < LOWVOLTAGE * VOLTAGECONVERSION){
         LED1OFF
@@ -306,9 +308,13 @@ __interrupt void ADC_ISR(void){
         LED2OFF
     }
 }
+//--End ADC ISR
 
 #pragma vector = EUSCI_A1_VECTOR
 __interrupt void ISR_EUSCI_A1(void){
+    /*
+     * Loads from memory defined by message pointer into buf until null char is hit.
+     */
     if(message[position] == '\0'){ // '\0' is the ending char so exit and stop transmitting
         position = 1;
         UCA1IE &= ~UCTXCPTIE; //Turn off TX interrupt because we are done
@@ -324,6 +330,12 @@ __interrupt void ISR_EUSCI_A1(void){
 //ISR
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_I2C_ISR(void){
+    /*
+     * If RTC_Config is true, transmits the RTC config array to the RTC
+     * Else if the interrupt is 0x16 then receive data from the RTC
+     * If the interrupt is 0x18 then transmit the register address to the RTC
+     * Then load each response into individual variables
+     */
     if(RTC_config){
         //Transmit Config Data to RTC
         if(Data_Cnt == (sizeof(RTCPacket)-1)){
@@ -357,9 +369,15 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         }
     }
 }
+//--End I2C ISR
 
 #pragma vector = PORT4_VECTOR
 __interrupt void ISR_Port4_S1(void){
+    /*
+     * On SW1 pressed set system state to moveForward, active motion
+     * Clear the timer count to align timer with switch press
+     * Then start transmit of forward message over UART
+     */
     //SW1 ISR
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
@@ -375,8 +393,15 @@ __interrupt void ISR_Port4_S1(void){
 
     P4IFG &= ~BIT1;
 }
+//--End SW1 ISR
+
 #pragma vector = PORT2_VECTOR
 __interrupt void ISR_Port2_S2(void){
+    /*
+     * On SW2 pressed set system state to moveReverse, active motion
+     * Clear the timer count to align timer with switch press
+     * Then start transmit of reverse message
+     */
     //SW2 ISR
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
@@ -391,9 +416,14 @@ __interrupt void ISR_Port2_S2(void){
 
     P2IFG &= ~BIT3;
 }
+//--End SW2 ISR
 
 #pragma vector = TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
+    /*
+     * Timer with state machine controlling motion of the motor
+     * Each state machine is enabled by moveForward or moveReverse
+     */
 
     //FSM controlling the order of led lighting
     //Todo add default cases
@@ -456,5 +486,4 @@ __interrupt void ISR_TB0_CCR0(void){
     }
     TB0CCTL0 &= ~CCIFG;
 }
-
-
+//End Timer ISR
