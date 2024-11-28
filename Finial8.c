@@ -1,8 +1,11 @@
+//-------------------------------------------------------------------------------
+// Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
+//  reverseCycleNumber = 128 because 513 is the steps per cycle and 513/4 = 128
+//  forwardCycleNumber = 13 because it is roughly 1/10th of 128
+//  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
+//       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
+//-------------------------------------------------------------------------------
 #include <msp430.h>
-//cats for da cat throne!
-//merp
-//nya
-
 
 /**
  * Leah Baker, 371, 11/18/2024 main.c
@@ -60,6 +63,11 @@
 #define OFFSET 16 //Measured offset at 0v
 
 
+//Knobs to control motor behavior
+#define ForwardCycleNumber 13 //Clockwise
+#define ReverseCycleNumber 128 //AntiClockwise
+
+
 char Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
 _Bool firstpacket = 1;
 int Data_Cnt = 0;
@@ -77,9 +85,16 @@ char Minutes_Recived;
 int ADC_Value;
 _Bool RTC_Recive_Flag = 0;
 
+
+// Motor control variables
+_Bool moveForward = 0;
+_Bool moveReverse = 0;
+int state = 0;
+int cycle = 0;
+
 void I_O_Init(void){
     /*
-     * Initilize inputs and outputs
+     * Initialize inputs and outputs
      */
 
     LED1OUT
@@ -104,7 +119,7 @@ void I_O_Init(void){
 
 void ADC_Init(void){
     /*
-     * Initilize the ADC
+     * Initialize the ADC
      */
 
     ADCCTL0 &= ~ADCSHT; //Clear ADCSHT
@@ -122,7 +137,7 @@ void ADC_Init(void){
 
 void I2C_Init(void){
     /*
-     * Initilize the I2C controller
+     * Initialize the I2C controller
      * P1.3 as SCL
      * P1.2 as SDA
      */
@@ -144,7 +159,7 @@ void I2C_Init(void){
 
 void UART_init(void){
     /*
-     * Initilize the eUSCI_A1 as UART
+     * Initialize the eUSCI_A1 as UART
      */
     //-- Put eUSCI_A1 into reset
     UCA1CTLW0 |= UCSWRST;
@@ -157,6 +172,22 @@ void UART_init(void){
     //-- Take eUSCI_A1 out of SW reset
     UCA1CTLW0 &= ~UCSWRST;
 }
+
+void Timer_init(void)
+{
+    //--Setup Timer
+    TB0CTL |= TBCLR; //Clear timer and dividers
+    TB0CTL |= TBSSEL__SMCLK;
+    TB0CTL |= MC__UP; //Mode Up
+    TB0CTL |= ID__1;
+    TB0EX0 = TBIDEX__1;
+    TB0CCR0 = 4678;
+
+    //Timer ISQ
+    TB0CCTL0 &= ~CCIFG; //Clear interrupt flag
+    TB0CCTL0 |= CCIE;
+}
+
 void init(void){
     /* Init function
      *
@@ -165,6 +196,7 @@ void init(void){
     I_O_Init();
     ADC_Init();
     I2C_Init();
+    Timer_Init();
 
     //Interrupt Enables
     ADCIE |= ADCIE0; //Enable ADC Conv Compleate IRQ
@@ -189,7 +221,7 @@ void RTC_Config(void){
 }
 
 void RTC_Recive(void){
-    //Recive Data from RTC
+    //Receive Data from RTC
 
     RTC_Recive_Flag = 0;
 
@@ -198,7 +230,7 @@ void RTC_Recive(void){
     UCB0CTLW0 |= UCTR; //Tx mode
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
-    while ((UCB0IFG & UCSTPIFG) == 0){} //Waiting untill the I2C controller completes
+    while ((UCB0IFG & UCSTPIFG) == 0){} //Waiting until the I2C controller completes
     UCB0IFG &= ~UCSTPIFG;
 
     UCB0CTLW0 &= ~UCTR; //Rx Mode
@@ -206,12 +238,12 @@ void RTC_Recive(void){
     Data_Cnt = 0;
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
-    while ((UCB0IFG & UCSTPIFG) == 0){}  //Wait untill I2C completes
+    while ((UCB0IFG & UCSTPIFG) == 0){}  //Wait until I2C completes
     UCB0IFG &= ~UCSTPIFG;
 }
 
 void ADC_Measure(void){
-    //Start the ADC mesurment
+    //Start the ADC measurement
     ADCCTL0 |= ADCENC | ADCSC; //Enable and start conversion
     while((ADCIFG & ADCIFG0) == 0){} //Wait for conversion to finish (??? TI says it works)
 
