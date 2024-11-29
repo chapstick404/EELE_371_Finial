@@ -201,7 +201,7 @@ void Timer_Init(void)
     TB0CCTL0 |= CCIE;
 }
 
-void init(void){
+void Init(void){
     /* Init function
      *
      */
