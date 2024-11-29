@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------
 // Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
-//  reverseCycleNumber = 128 because 513 is the steps per cycle and 513/4 = 128
-//  forwardCycleNumber = 13 because it is roughly 1/10th of 128
+//  ReverseCycleNumber = 128 because 513 is the steps per cycle and 513/4 = 128
+//  ForwardCycleNumber = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
@@ -68,7 +68,7 @@
 #define ReverseCycleNumber 128 //AntiClockwise
 
 
-char RTCPacket[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool port_expander_config = 0; //If true the I2C sends the port expander config over the bus
@@ -76,10 +76,10 @@ _Bool port_expander_config = 0; //If true the I2C sends the port expander config
 int Data_Cnt = 0;
 
 // UART and message variables
-char forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
-char reverse[] = "\n\r Motor advanced 1 step \r\n\0";
-int position = 1;
-char *message; //Memory start of message to be sent
+char Forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
+char Reverse[] = "\n\r Motor advanced 1 step \r\n\0";
+int Position = 1;
+char *Message; //Memory start of message to be sent
 
 char Data_In;
 char Seconds_Recived;
@@ -90,10 +90,10 @@ _Bool RTC_Recive_Flag = 0;
 
 
 // Motor control variables
-_Bool moveForward = 0;
-_Bool moveReverse = 0;
-int state = 0;
-int cycle = 0;
+_Bool Move_Forward = 0;
+_Bool Move_Reverse = 0;
+int State = 0;
+int Cycle = 0;
 
 void I_O_Init(void){
     /*
@@ -231,7 +231,7 @@ void RTC_Config(void){
 
     UCB0CTLW0 |= UCTR; //Transmit mode
     UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
-    UCB0TBCNT = sizeof(RTCPacket); //number of bytes in packet
+    UCB0TBCNT = sizeof(RTC_Packet); //number of bytes in packet
     RTC_config = 1;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
@@ -290,7 +290,9 @@ int main(void)
 //---ISR--
 #pragma vector=ADC_VECTOR
 __interrupt void ADC_ISR(void){
-    //Gather ADC value and compare to voltage macros
+    /*
+     * Gather ADC value and compare to voltage macros
+     */
     ADC_Value = ADCMEM0;
     if(ADC_Value - OFFSET < LOWVOLTAGE * VOLTAGECONVERSION){
         LED1OFF
@@ -306,16 +308,20 @@ __interrupt void ADC_ISR(void){
         LED2OFF
     }
 }
+//--End ADC ISR
 
 #pragma vector = EUSCI_A1_VECTOR
 __interrupt void ISR_EUSCI_A1(void){
-    if(message[position] == '\0'){ // '\0' is the ending char so exit and stop transmitting
-        position = 1;
+    /*
+     * Loads from memory defined by message pointer into buf until null char is hit.
+     */
+    if(Message[Position] == '\0'){ // '\0' is the ending char so exit and stop transmitting
+        Position = 1;
         UCA1IE &= ~UCTXCPTIE; //Turn off TX interrupt because we are done
     }
     else{
-        UCA1TXBUF = message[position];
-        position++;
+        UCA1TXBUF = Message[Position];
+        Position++;
     }
     UCA1IFG &= ~UCTXCPTIFG;
 }
@@ -324,15 +330,21 @@ __interrupt void ISR_EUSCI_A1(void){
 //ISR
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void EUSCI_B0_I2C_ISR(void){
+    /*
+     * If RTC_Config is true, transmits the RTC config array to the RTC
+     * Else if the interrupt is 0x16 then receive data from the RTC
+     * If the interrupt is 0x18 then transmit the register address to the RTC
+     * Then load each response into individual variables
+     */
     if(RTC_config){
         //Transmit Config Data to RTC
-        if(Data_Cnt == (sizeof(RTCPacket)-1)){
-            UCB0TXBUF = RTCPacket[Data_Cnt];
+        if(Data_Cnt == (sizeof(RTC_Packet)-1)){
+            UCB0TXBUF = RTC_Packet[Data_Cnt];
             Data_Cnt = 0;
             RTC_config = 0;
         }
         else{
-            UCB0TXBUF = RTCPacket[Data_Cnt];
+            UCB0TXBUF = RTC_Packet[Data_Cnt];
             Data_Cnt++;
         }
         }
@@ -357,50 +369,68 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         }
     }
 }
+//--End I2C ISR
 
 #pragma vector = PORT4_VECTOR
 __interrupt void ISR_Port4_S1(void){
+    /*
+     * On SW1 pressed set system state to Move_Forward, active motion
+     * Clear the timer count to align timer with switch press
+     * Then start transmit of forward message over UART
+     */
     //SW1 ISR
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
-    moveForward = 1;
-    state = 0;
+    Move_Forward = 1;
+    State = 0;
     TB0R = 0; //Clear timer count
 
 
-    //Sends forward on press
+    //Sends Forward on press
     UCA1IE |= UCTXCPTIE;
-    message = forward; //Set the message to be sent
-    UCA1TXBUF = message[0]; //Transmit the start of the message
+    Message = Forward; //Set the message to be sent
+    UCA1TXBUF = Message[0]; //Transmit the start of the message
 
     P4IFG &= ~BIT1;
 }
+//--End SW1 ISR
+
 #pragma vector = PORT2_VECTOR
 __interrupt void ISR_Port2_S2(void){
+    /*
+     * On SW2 pressed set system state to Move_Reverse, active motion
+     * Clear the timer count to align timer with switch press
+     * Then start transmit of reverse message
+     */
     //SW2 ISR
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
-    moveReverse = 1;
-    state = 0;
+    Move_Reverse = 1;
+    State = 0;
     TB0R = 0;
 
     //Sends reverse on press
     UCA1IE |= UCTXCPTIE;
-    message = reverse; //Sets the message to be sent
-    UCA1TXBUF = message[0]; //Transmit the start of the message
+    Message = Reverse; //Sets the message to be sent
+    UCA1TXBUF = Message[0]; //Transmit the start of the message
 
     P2IFG &= ~BIT3;
 }
+//--End SW2 ISR
 
 #pragma vector = TIMER0_B0_VECTOR
 __interrupt void ISR_TB0_CCR0(void){
+    /*
+     * Timer with state machine controlling motion of the motor
+     * Each state machine is enabled by Move_Forward or Move_Reverse
+     */
 
     //FSM controlling the order of led lighting
     //Todo add default cases
-    if(moveForward){
+    if(Move_Forward){
         P3OUT &= 0;
-        state++;
-        switch (state) {
+        State++;
+        switch (State) {
         case 1:
             P3OUT |= BIT1;
             break;
@@ -414,22 +444,22 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            state = 0;
-            if(cycle == ForwardCycleNumber -1){ //We have reached the maximum number of cycles, time to end
-                moveForward = 0;
-                cycle = 0;
+            State = 0;
+            if(Cycle == ForwardCycleNumber -1){ //We have reached the maximum number of cycles, time to end
+                Move_Forward = 0;
+                Cycle = 0;
             }
             else{
-                cycle++;
+                Cycle++;
             }
             break;
         }
     }
 
-    if(moveReverse){
+    if(Move_Reverse){
         P3OUT &= 0;
-        state++;
-        switch (state) {
+        State++;
+        switch (State) {
         case 1:
             P3OUT |= BIT3;
             break;
@@ -443,18 +473,17 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            state = 0;
-            if(cycle == ReverseCycleNumber -1){ //We have reached the maxium number of cylces, time to end
-                moveReverse = 0;
-                cycle = 0;
+            State = 0;
+            if(Cycle == ReverseCycleNumber -1){ //We have reached the maxium number of cylces, time to end
+                Move_Reverse = 0;
+                Cycle = 0;
             }
             else{
-                cycle++;
+                Cycle++;
             }
             break;
         }
     }
     TB0CCTL0 &= ~CCIFG;
 }
-
-
+//End Timer ISR
