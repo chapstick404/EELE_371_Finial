@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------
 // Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
-//  Reverse_Cycle_Number = 128 because 513 is the steps per cycle and 513/4 = 128
-//  Forward_Cycle_Number = 13 because it is roughly 1/10th of 128
+//  REVERSE_CYCLE_NUMBER = 128 because 513 is the steps per cycle and 513/4 = 128
+//  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
@@ -14,34 +14,34 @@
  * Accuracy is 0.000415V
  */
 
-#define SW1wINT {P4SEL0 &= ~BIT1; \
+#define SW1WINT {P4SEL0 &= ~BIT1; \
                 P4SEL1 &= ~BIT1; \
                 P4DIR &= ~BIT1; \
                 P4REN |= BIT1; \
                 P4OUT |= BIT1; \
                 P4IES |= BIT1; } //Setting SW1 as an input with H-L sensitivity (P4.1)
                                  //Interrupts will still need to be enabled
-#define SW1IntEn {P4IFG &= ~BIT1; \
+#define SW1INTEN {P4IFG &= ~BIT1; \
                   P4IE |= BIT1;}
 
-#define SW2wINT {P2SEL0 &= ~BIT3; \
+#define SW2WINT {P2SEL0 &= ~BIT3; \
                 P2SEL1 &= ~BIT3; \
                 P2DIR &= ~BIT3; \
                 P2REN |= BIT3; \
                 P2OUT |= BIT3; \
                 P2IES |= BIT3; } //Setting SW2 as an input with H-L sensitivity (P4.1)
                                  //Interrupts will still need to be enabled
-#define SW2IntEn {P2IFG &= ~BIT3; \
+#define SW2INTEN {P2IFG &= ~BIT3; \
                   P2IE |= BIT3;}
 
 
 #define LED1ON P1OUT |= BIT0;
 #define LED1OFF P1OUT &= ~BIT0;
-#define LED1Tog P1OUT ^= BIT0;
+#define LED1TOG P1OUT ^= BIT0;
 
 #define LED2ON P6OUT |= BIT6;
 #define LED2OFF P6OUT &= ~BIT6;
-#define LED2Tog P6OUT ^= BIT6;
+#define LED2TOG P6OUT ^= BIT6;
 
 #define LED2OUT {P6DIR |= BIT6; \
                 LED2OFF} //Setting LED2 as an output (P6.6)
@@ -64,14 +64,14 @@
 
 
 //Knobs to control motor behavior
-#define Forward_Cycle_Number 13 //Clockwise
-#define Reverse_Cycle_Number 128 //AntiClockwise
+#define FORWARD_CYCLE_NUMBER 13 //Clockwise
+#define REVERSE_CYCLE_NUMBER 128 //AntiClockwise
 
 
 char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
-_Bool port_expander_config = 0; //If true the I2C sends the port expander config over the bus
+_Bool Port_expander_config = 0; //If true the I2C sends the port expander config over the bus
 
 int Data_Cnt = 0;
 
@@ -82,11 +82,11 @@ int Position = 1;
 char *Message; //Memory start of message to be sent
 
 char Data_In;
-char Seconds_Recived;
-char Minutes_Recived;
+char Seconds_Received;
+char Minutes_Received;
 
 int ADC_Value;
-_Bool RTC_Recive_Flag = 0;
+_Bool RTC_Receive_Flag = 0;
 
 
 // Motor control variables
@@ -110,8 +110,8 @@ void I_O_Init(void){
 
     P3OUT |= BIT0;
 
-    SW1wINT
-    SW2wINT
+    SW1WINT
+    SW2WINT
 
     P1SEL1 |= BIT4;
     P1SEL0 |= BIT4; //P1.4 for A4 (Device specific Datasheet)
@@ -218,8 +218,8 @@ void Init(void){
     UCB0IE |= UCTXIE0;
     UCB0IE |= UCRXIE0;
 
-    SW1IntEn
-    SW2IntEn
+    SW1INTEN
+    SW2INTEN
 
     PM5CTL0 &= ~LOCKLPM5; // Turn on GPIO
     __enable_interrupt();
@@ -239,10 +239,10 @@ void RTC_Config(void){
     UCB0IFG &= ~UCSTPIFG;
 }
 
-void RTC_Recive(void){
+void RTC_Receive(void){
     //Receive Data from RTC
 
-    RTC_Recive_Flag = 0;
+    RTC_Receive_Flag = 0;
 
     //Transmit Register Address to RTC
     UCB0TBCNT = 0x01; //Limit to 1 byte transmit
@@ -278,8 +278,12 @@ int main(void)
 
     while(1){
         ADC_Measure();
-        if(RTC_Recive_Flag){
-            RTC_Recive();
+        if(RTC_Receive_Flag){
+            RTC_Receive();
+            //Sends current time when unsafe
+            UCA1IE |= UCTXCPTIE;
+            Message = Minutes_Received + " minutes and " + Seconds_Received + " seconds";
+            UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
 
     }
@@ -299,7 +303,7 @@ __interrupt void ADC_ISR(void){
         LED2ON
     }
     else if(ADC_Value - OFFSET > HIGHVOLTAGE * VOLTAGECONVERSION){
-        RTC_Recive_Flag = 1;
+        RTC_Receive_Flag = 1;
         LED1ON
         LED2OFF
     }
@@ -362,10 +366,10 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
                 break;
         }
         if(Data_Cnt == 1){
-            Seconds_Recived = Data_In;
+            Seconds_Received = Data_In;
         }
         if(Data_Cnt == 2){
-            Minutes_Recived = Data_In;
+            Minutes_Received = Data_In;
         }
     }
 }
@@ -445,7 +449,7 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == Forward_Cycle_Number -1){ //We have reached the maximum number of cycles, time to end
+            if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
                 Move_Forward = 0;
                 Cycle = 0;
             }
@@ -474,7 +478,7 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == Reverse_Cycle_Number -1){ //We have reached the maxium number of cylces, time to end
+            if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
             }
