@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------
 // Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
-//  ReverseCycleNumber = 128 because 513 is the steps per cycle and 513/4 = 128
-//  ForwardCycleNumber = 13 because it is roughly 1/10th of 128
+//  Reverse_Cycle_Number = 128 because 513 is the steps per cycle and 513/4 = 128
+//  Forward_Cycle_Number = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
@@ -64,8 +64,8 @@
 
 
 //Knobs to control motor behavior
-#define ForwardCycleNumber 13 //Clockwise
-#define ReverseCycleNumber 128 //AntiClockwise
+#define Forward_Cycle_Number 13 //Clockwise
+#define Reverse_Cycle_Number 128 //AntiClockwise
 
 
 char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
@@ -445,7 +445,7 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == ForwardCycleNumber -1){ //We have reached the maximum number of cycles, time to end
+            if(Cycle == Forward_Cycle_Number -1){ //We have reached the maximum number of cycles, time to end
                 Move_Forward = 0;
                 Cycle = 0;
             }
@@ -474,7 +474,7 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == ReverseCycleNumber -1){ //We have reached the maxium number of cylces, time to end
+            if(Cycle == Reverse_Cycle_Number -1){ //We have reached the maxium number of cylces, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
             }
