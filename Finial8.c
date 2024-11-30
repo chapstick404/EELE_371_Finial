@@ -290,7 +290,7 @@ int main(void)
                     " Day: " + (String)Day_Received + " " +
                     (String)Hours_Received + " hours "
                     (String)Minutes_Received + " minutes and " + 
-                    (String)Seconds_Received + " seconds";
+                    (String)Seconds_Received + " seconds\0";
             Message = Time;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
