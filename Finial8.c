@@ -5,6 +5,7 @@
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
+#include stdio.h
 #include <msp430.h>
 
 /**
