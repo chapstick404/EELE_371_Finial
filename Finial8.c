@@ -286,11 +286,11 @@ int main(void)
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
-            Time = + "Month: " Month_Received  + 
-                    " Day: " + Day_Received + " " +
-                    Hours_Received + " hours "
-                    Minutes_Received + " minutes and " + 
-                    Seconds_Received + " seconds";
+            Time = + "Month: " (String)Month_Received  + 
+                    " Day: " + (String)Day_Received + " " +
+                    (String)Hours_Received + " hours "
+                    (String)Minutes_Received + " minutes and " + 
+                    (String)Seconds_Received + " seconds";
             Message = Time;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
