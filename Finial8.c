@@ -84,6 +84,9 @@ char *Message; //Memory start of message to be sent
 char Data_In;
 char Seconds_Received;
 char Minutes_Received;
+char Hours_Received;
+char Day_Received;
+char Month_Received;
 
 int ADC_Value;
 _Bool RTC_Receive_Flag = 0;
