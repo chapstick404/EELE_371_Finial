@@ -79,7 +79,7 @@ int Data_Cnt = 0;
 char Forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
 char Reverse[] = "\n\r Motor advanced 1 step \r\n\0";
 int Position = 1;
-char Time[] = "Placeholder\0";
+char Time[100];
 char *Message; //Memory start of message to be sent
 
 char Data_In;
