@@ -79,6 +79,7 @@ int Data_Cnt = 0;
 char Forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
 char Reverse[] = "\n\r Motor advanced 1 step \r\n\0";
 int Position = 1;
+char Time[];
 char *Message; //Memory start of message to be sent
 
 char Data_In;
@@ -285,7 +286,12 @@ int main(void)
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
-            Message = Minutes_Received + " minutes and " + Seconds_Received + " seconds";
+            Time = + "Month: " Month_Received  + 
+                    " Day: " + Day_Received + " " +
+                    Hours_Received + " hours "
+                    Minutes_Received + " minutes and " + 
+                    Seconds_Received + " seconds";
+            Message = Time;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
 
