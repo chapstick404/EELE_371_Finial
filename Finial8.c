@@ -261,7 +261,7 @@ void RTC_Receive(void){
     UCB0IFG &= ~UCSTPIFG;
 
     UCB0CTLW0 &= ~UCTR; //Rx Mode
-    UCB0TBCNT = 0x02; //Want only 2 Registers from RTC
+    UCB0TBCNT = 0x06; //Want only 6 Registers from RTC
     Data_Cnt = 0;
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
@@ -380,11 +380,24 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
             default:
                 break;
         }
-        if(Data_Cnt == 1){
+        switch(Data_Cnt){
+        case 1:
             Seconds_Received = Data_In;
-        }
-        if(Data_Cnt == 2){
+            break;
+        case 2:
             Minutes_Received = Data_In;
+            break;
+        case 3:
+            Hours_Received = Data_In;
+            break;
+        case 4:
+            Day_Received = Data_In;
+            break;
+        case 5:
+            break; //Do not care about weekday register
+        case 6:
+            Month_Received = Data_In;
+            break;
         }
     }
 }
