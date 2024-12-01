@@ -5,7 +5,7 @@
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
-#include stdio.h
+#include <stdio.h>
 #include <msp430.h>
 
 /**
@@ -91,6 +91,7 @@ char Day_Received;
 char Month_Received;
 
 int ADC_Value;
+_Bool ADC_Complete = 0;
 _Bool RTC_Receive_Flag = 0;
 
 
@@ -111,7 +112,7 @@ void I_O_Init(void){
     P3SEL0 &= ~(BIT0 | BIT1| BIT2 | BIT3);
     P3SEL1 &= ~(BIT0 | BIT1| BIT2 | BIT3); //P3.0 - P3.3 set as I/O
     P3DIR |= (BIT0 | BIT1| BIT2 | BIT3) ;
-    P3OUT &= ~(BIT0 | BIT1| BIT2 | BIT3);SW1wINT
+    P3OUT &= ~(BIT0 | BIT1| BIT2 | BIT3);
 
     P3OUT |= BIT0;
 
@@ -238,6 +239,7 @@ void RTC_Config(void){
     UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
     UCB0TBCNT = sizeof(RTC_Packet); //number of bytes in packet
     RTC_config = 1;
+    Data_Cnt = 0;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}
@@ -269,15 +271,16 @@ void RTC_Receive(void){
 
 void ADC_Measure(void){
     //Start the ADC measurement
+    ADC_Complete = 0;
     ADCCTL0 |= ADCENC | ADCSC; //Enable and start conversion
-    while((ADCIFG & ADCIFG0) == 0){} //Wait for conversion to finish (??? TI says it works)
+    while(ADC_Complete == 0){} //Wait for conversion to finish
 
 }
 
 int main(void)
 {
     WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
-    init();
+    Init();
 
     RTC_Config();
 
@@ -287,7 +290,7 @@ int main(void)
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
-            sprintf(Time, "\r\nMonth: %d Day: %d %d hours %d minutes and %d seconds\r\n",
+            sprintf(Time, "\r\nMonth: %x Day: %x %x hours %x minutes and %x seconds\r\n",
                     Month_Received,
                     Day_Received,
                     Hours_Received,
@@ -322,6 +325,7 @@ __interrupt void ADC_ISR(void){
         LED1OFF
         LED2OFF
     }
+    ADC_Complete = 1;
 }
 //--End ADC ISR
 
