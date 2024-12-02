@@ -69,7 +69,7 @@
 
 
 char RTCPacket[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
-char port_expander_packet[] = {0x00, 0x00};
+char port_expander_packet[] = {0x00, 0x00, 0x00};
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool port_expander_config = 0; //If true the I2C sends the port expander config over the bus
@@ -249,7 +249,7 @@ void Port_Expander_Config(void){
     //Transmit configuration to the port expander
     UCB0CTLW0 |= UCTR; //Transmit mode
     UCB0I2CSA = 0x0020; //Slave address =0x20 (Port Expander address)
-    UCB0TBCNT = sizeof(port_expander_config); //number of bytes in packet
+    UCB0TBCNT = sizeof(port_expander_packet); //number of bytes in packet
     port_expander_config = 1;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
@@ -303,42 +303,43 @@ void ADC_Measure(void){
 
 }
 
-int SegConvert(int num){
+unsigned char SegConvert(int num){
     //converts an single digit number to the pins that need to be turned on for the 7 seg display
     switch(num){
     case 0:
-        return 63;
+        return ~63;
         break;
     case 1:
-        return 6;
+        return ~6;
         break;
     case 2:
-        return 91;
+        return ~91;
         break;
     case 3:
-        return 79;
+        return ~79;
         break;
     case 4:
-        return 102;
+        return ~102;
         break;
     case 5:
-        return 109;
+        return ~109;
         break;
     case 6:
-        return 125;
+        return ~125;
         break;
     case 7:
-        return 7;
+        return ~7;
         break;
     case 8:
-        return 127;
+        return ~127;
         break;
     case 9:
-        return 103;
+        return ~103;
         break;
+    default:
+        return ~54;
 
     }
-    return 0;
 }
 
 int main(void)
@@ -415,16 +416,16 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
     }
 
     if(port_expander_config){
-        //Transmit Config Data to Port Expander
-            if(Data_Cnt == (sizeof(port_expander_packet)-1)){
-                UCB0TXBUF = port_expander_packet[Data_Cnt];
-                Data_Cnt = 0;
-                port_expander_config = 0;
-            }
-            else{
-                UCB0TXBUF = port_expander_packet[Data_Cnt];
-                Data_Cnt++;
-            }
+    //Transmit Config Data to Port Expander
+        if(Data_Cnt == (sizeof(port_expander_packet)-1)){
+            UCB0TXBUF = port_expander_packet[Data_Cnt];
+            Data_Cnt = 0;
+            port_expander_config = 0;
+        }
+        else{
+            UCB0TXBUF = port_expander_packet[Data_Cnt];
+            Data_Cnt++;
+        }
     }
 
 
@@ -450,7 +451,7 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         }
         if(Port_Expander_Select){
             if(Data_Cnt == 0){
-                UCB0TXBUF = 0x12;
+                UCB0TXBUF = 0x13;
                 Data_Cnt++;
             }
             else if(Data_Cnt == 1){
