@@ -1,11 +1,19 @@
 //-------------------------------------------------------------------------------
 // Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
+// expected 50lbs = 2V  0-30lbs = 1.2V
+//  Safe is less than 35 lbs because 0-30 is normal operating area and being that close to standard is fine
+//  warning is 35-45 lbs because warning shouldn't be too large an area and should warn that one is approaching unsafe
+//  unsafe is 45+ lbs because 50 lbs is the max the drill is expected to withstand, and being that close or higher is dangerous
+//  LOWVOLTAGE = 35lbs = 1400 mV, 
+//  HIGHVOLTAGE = 45lbs = 1800 mV
+//
 //  REVERSE_CYCLE_NUMBER = 128 because 513 is the steps per cycle and 513/4 = 128
 //  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
 #include <stdio.h>
+#include <stdint.h>
 #include <msp430.h>
 
 /**
@@ -51,15 +59,16 @@
 #define LED1OUT {P1DIR |= BIT0; \
                 LED1OFF} //Setting LED1 as an output (P1.0)
 
-#define VOLTAGECONVERSION 1230 //Conversion factor for voltage to measured ADC value
+#define VOLTAGECONVERSION 120 //Conversion factor for voltage in tenths to measured ADC value
 
 
 //Controls for the status logic
 //GreenLED (LED2) below LOWVOLTAGE
 //RedLED (LED1) above HIGHVOLTAGE
 //No LED between LOWVOLTAGE and HIGHVOLTAGEs
-#define LOWVOLTAGE 1
-#define HIGHVOLTAGE 2
+//**(THIS IS NOW IN TENTHS OF A VOLT!)**
+#define LOWVOLTAGE 14
+#define HIGHVOLTAGE 18
 
 #define OFFSET 16 //Measured offset at 0v
 
@@ -68,9 +77,14 @@
 #define FORWARD_CYCLE_NUMBER 13 //Clockwise
 #define REVERSE_CYCLE_NUMBER 128 //AntiClockwise
 
+enum SystemStates{Safe, Warning, Unsafe};
 
-char Port_Expander_Packet[] = {0x00, 0x00, 0x00};
-char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+enum SystemStates System_State = Safe;
+enum SystemStates Previous_State = Safe;
+
+
+uint8_t RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+unit8_t Port_Expander_Packet[] = {0x00, 0x00, 0x00};
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool Port_expander_config = 0; //If true the I2C sends the port expander config over the bus
@@ -82,23 +96,23 @@ int Data_Cnt = 0;
 int value = 0;
 
 // UART and message variables
-char Forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
-char Reverse[] = "\n\r Motor advanced 1 step \r\n\0";
+char Reverse[] = "\n\r Motor reversed 1 rotation. \r\n\0";
+char Forward[] = "\n\r Motor advanced 1 step \r\n\0";
 int Position = 1;
 char Time[100];
 char *Message; //Memory start of message to be sent
 
 char Data_In;
-char Seconds_Received;
-char Minutes_Received;
-char Hours_Received;
-char Day_Received;
-char Month_Received;
+
+uint8_t Seconds_Received; //todo change to a struct
+uint8_t Minutes_Received;
+uint8_t Hours_Received;
+uint8_t Day_Received;
+uint8_t Month_Received;
 
 int ADC_Value;
 _Bool ADC_Complete = 0;
 _Bool RTC_Receive_Flag = 0;
-
 
 
 // Motor control variables
@@ -358,10 +372,10 @@ int main(void)
 
     while(1){
         ADC_Measure();
-        value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
-        //Todo add algorithm to convert from voltage value to pressure and split into two vars
-        Display_Value();
-        if(RTC_Receive_Flag){
+        if((System_State == Unsafe) && (System_State != Previous_State)){
+            value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
+            //Todo add algorithm to convert from voltage value to pressure and split into two vars
+            Display_Value();
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
@@ -374,6 +388,7 @@ int main(void)
             Message = Time;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
+        Previous_State = System_State;
 
     }
 
@@ -388,15 +403,17 @@ __interrupt void ADC_ISR(void){
      */
     ADC_Value = ADCMEM0;
     if(ADC_Value - OFFSET < LOWVOLTAGE * VOLTAGECONVERSION){
+        System_State = Safe;
         LED1OFF
         LED2ON
     }
     else if(ADC_Value - OFFSET > HIGHVOLTAGE * VOLTAGECONVERSION){
-        RTC_Receive_Flag = 1;
+        System_State = Unsafe;
         LED1ON
         LED2OFF
     }
     else{
+        System_State = Warning;
         LED1OFF
         LED2OFF
     }
@@ -558,43 +575,14 @@ __interrupt void ISR_TB0_CCR0(void){
      * Each state machine is enabled by Move_Forward or Move_Reverse
      */
 
-    //FSM controlling the order of led lighting
-    //Todo add default cases
-    if(Move_Forward){
-        P3OUT &= 0;
-        State++;
-        switch (State) {
-        case 1:
-            P3OUT |= BIT1;
-            break;
-
-        case 2:
-            P3OUT |= BIT2;
-            break;
-
-        case 3:
-            P3OUT |= BIT3;
-            break;
-        case 4:
-            P3OUT |= BIT0;
-            State = 0;
-            if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
-                Move_Forward = 0;
-                Cycle = 0;
-            }
-            else{
-                Cycle++;
-            }
-            break;
-        }
-    }
+    //FSM controlling the order of motor driving
 
     if(Move_Reverse){
         P3OUT &= 0;
         State++;
         switch (State) {
         case 1:
-            P3OUT |= BIT3;
+            P3OUT |= BIT1;
             break;
 
         case 2:
@@ -602,12 +590,12 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
 
         case 3:
-            P3OUT |= BIT1;
+            P3OUT |= BIT3;
             break;
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
+            if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
             }
@@ -615,6 +603,40 @@ __interrupt void ISR_TB0_CCR0(void){
                 Cycle++;
             }
             break;
+        default:
+            P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
+            break;
+        }
+    }
+
+    if(Move_Forward){
+        P3OUT &= 0;
+        State++;
+        switch (State) {
+        case 1:
+            P3OUT |= BIT3;
+            break;
+
+        case 2:
+            P3OUT |= BIT2;
+            break;
+
+        case 3:
+            P3OUT |= BIT1;
+            break;
+        case 4:
+            P3OUT |= BIT0;
+            State = 0;
+            if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
+                Move_Forward = 0;
+                Cycle = 0;
+            }
+            else{
+                Cycle++;
+            }
+            break;
+        default:
+            P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
         }
     }
     TB0CCTL0 &= ~CCIFG;
