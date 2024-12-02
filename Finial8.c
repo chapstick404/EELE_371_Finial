@@ -51,15 +51,16 @@
 #define LED1OUT {P1DIR |= BIT0; \
                 LED1OFF} //Setting LED1 as an output (P1.0)
 
-#define VOLTAGECONVERSION 1230 //Conversion factor for voltage to measured ADC value
+#define VOLTAGECONVERSION 120 //Conversion factor for voltage in tenths to measured ADC value
 
 
 //Controls for the status logic
 //GreenLED (LED2) below LOWVOLTAGE
 //RedLED (LED1) above HIGHVOLTAGE
 //No LED between LOWVOLTAGE and HIGHVOLTAGEs
-#define LOWVOLTAGE 1
-#define HIGHVOLTAGE 2
+//**(THIS IS NOW IN THENTHS OF A VOLT!)**
+#define LOWVOLTAGE 10
+#define HIGHVOLTAGE 20
 
 #define OFFSET 16 //Measured offset at 0v
 
