@@ -1,5 +1,12 @@
 //-------------------------------------------------------------------------------
 // Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
+// expected 50lbs = 2V  0-30lbs = 1.2V
+//  Safe is less than 35 lbs because 0-30 is normal operating area and being that close to standard is fine
+//  warning is 35-45 lbs because warning shouldn't be too large an area and should warn that one is approaching unsafe
+//  unsafe is 45+ lbs because 50 lbs is the max the drill is expected to withstand, and being that close or higher is dangerous
+//  LOWVOLTAGE = 35lbs = 1400 mV, 
+//  HIGHVOLTAGE = 45lbs = 1800 mV
+//
 //  REVERSE_CYCLE_NUMBER = 128 because 513 is the steps per cycle and 513/4 = 128
 //  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
@@ -59,9 +66,9 @@
 //GreenLED (LED2) below LOWVOLTAGE
 //RedLED (LED1) above HIGHVOLTAGE
 //No LED between LOWVOLTAGE and HIGHVOLTAGEs
-//**(THIS IS NOW IN THENTHS OF A VOLT!)**
-#define LOWVOLTAGE 10
-#define HIGHVOLTAGE 20
+//**(THIS IS NOW IN TENTHS OF A VOLT!)**
+#define LOWVOLTAGE 14
+#define HIGHVOLTAGE 18
 
 #define OFFSET 16 //Measured offset at 0v
 
