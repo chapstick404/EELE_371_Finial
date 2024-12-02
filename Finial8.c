@@ -84,7 +84,8 @@ char Time[100];
 char *Message; //Memory start of message to be sent
 
 char Data_In;
-char Seconds_Received;
+
+char Seconds_Received; //todo change to a struct
 char Minutes_Received;
 char Hours_Received;
 char Day_Received;
@@ -457,8 +458,8 @@ __interrupt void ISR_TB0_CCR0(void){
      * Each state machine is enabled by Move_Forward or Move_Reverse
      */
 
-    //FSM controlling the order of led lighting
-    //Todo add default cases
+    //FSM controlling the order of motor driving
+
     if(Move_Forward){
         P3OUT &= 0;
         State++;
@@ -484,6 +485,9 @@ __interrupt void ISR_TB0_CCR0(void){
             else{
                 Cycle++;
             }
+            break;
+        default:
+            P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
             break;
         }
     }
@@ -514,6 +518,8 @@ __interrupt void ISR_TB0_CCR0(void){
                 Cycle++;
             }
             break;
+        default:
+            P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
         }
     }
     TB0CCTL0 &= ~CCIFG;
