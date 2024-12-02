@@ -84,7 +84,7 @@ enum SystemStates Previous_State = Safe;
 
 
 uint8_t RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
-unit8_t Port_Expander_Packet[] = {0x00, 0x00, 0x00};
+uint8_t Port_Expander_Packet[] = {0x00, 0x00, 0x00};
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool Port_expander_config = 0; //If true the I2C sends the port expander config over the bus
@@ -372,10 +372,9 @@ int main(void)
 
     while(1){
         ADC_Measure();
+        value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
+        Display_Value();
         if((System_State == Unsafe) && (System_State != Previous_State)){
-            value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
-            //Todo add algorithm to convert from voltage value to pressure and split into two vars
-            Display_Value();
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
