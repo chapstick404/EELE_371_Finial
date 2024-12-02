@@ -11,6 +11,7 @@
 //  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
+//  For forward set divider to 5 so that 1/10 movement takes half time, 0.02339 seconds
 //-------------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdint.h>
