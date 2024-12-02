@@ -80,8 +80,8 @@ _Bool Port_expander_config = 0; //If true the I2C sends the port expander config
 int Data_Cnt = 0;
 
 // UART and message variables
-char Forward[] = "\n\r Motor reversed 1 rotation. \r\n\0";
-char Reverse[] = "\n\r Motor advanced 1 step \r\n\0";
+char Reverse[] = "\n\r Motor reversed 1 rotation. \r\n\0";
+char Forward[] = "\n\r Motor advanced 1 step \r\n\0";
 int Position = 1;
 char Time[100];
 char *Message; //Memory start of message to be sent
