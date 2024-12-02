@@ -6,6 +6,7 @@
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //-------------------------------------------------------------------------------
 #include <stdio.h>
+#include <stdint.h>
 #include <msp430.h>
 
 /**
@@ -73,7 +74,9 @@ enum SystemStates{Safe, Warning, Unsafe};
 
 enum SystemStates System_State = Safe;
 enum SystemStates Previous_State = Safe;
-char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
+
+
+uint8_t RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool Port_expander_config = 0; //If true the I2C sends the port expander config over the bus
@@ -89,11 +92,11 @@ char *Message; //Memory start of message to be sent
 
 char Data_In;
 
-char Seconds_Received; //todo change to a struct
-char Minutes_Received;
-char Hours_Received;
-char Day_Received;
-char Month_Received;
+uint8_t Seconds_Received; //todo change to a struct
+uint8_t Minutes_Received;
+uint8_t Hours_Received;
+uint8_t Day_Received;
+uint8_t Month_Received;
 
 int ADC_Value;
 _Bool ADC_Complete = 0;
