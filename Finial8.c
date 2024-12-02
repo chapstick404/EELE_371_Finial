@@ -460,7 +460,7 @@ __interrupt void ISR_TB0_CCR0(void){
 
     //FSM controlling the order of motor driving
 
-    if(Move_Forward){
+    if(Move_Reverse){
         P3OUT &= 0;
         State++;
         switch (State) {
@@ -478,8 +478,8 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
-                Move_Forward = 0;
+            if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
+                Move_Reverse = 0;
                 Cycle = 0;
             }
             else{
@@ -492,7 +492,7 @@ __interrupt void ISR_TB0_CCR0(void){
         }
     }
 
-    if(Move_Reverse){
+    if(Move_Forward){
         P3OUT &= 0;
         State++;
         switch (State) {
@@ -510,8 +510,8 @@ __interrupt void ISR_TB0_CCR0(void){
         case 4:
             P3OUT |= BIT0;
             State = 0;
-            if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
-                Move_Reverse = 0;
+            if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
+                Move_Forward = 0;
                 Cycle = 0;
             }
             else{
