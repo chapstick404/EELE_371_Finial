@@ -68,7 +68,10 @@
 #define FORWARD_CYCLE_NUMBER 13 //Clockwise
 #define REVERSE_CYCLE_NUMBER 128 //AntiClockwise
 
+enum SystemStates{Safe, Warning, Unsafe};
 
+enum SystemStates System_State = Safe;
+enum SystemStates Previous_State = Safe;
 char RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send Current time to the RTC as configuration
 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
@@ -94,7 +97,6 @@ char Month_Received;
 int ADC_Value;
 _Bool ADC_Complete = 0;
 _Bool RTC_Receive_Flag = 0;
-
 
 // Motor control variables
 _Bool Move_Forward = 0;
@@ -287,7 +289,7 @@ int main(void)
 
     while(1){
         ADC_Measure();
-        if(RTC_Receive_Flag){
+        if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
             //Sends current time when unsafe
             UCA1IE |= UCTXCPTIE;
@@ -300,6 +302,7 @@ int main(void)
             Message = Time;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
+        Previous_State = System_State;
 
     }
 
@@ -314,15 +317,17 @@ __interrupt void ADC_ISR(void){
      */
     ADC_Value = ADCMEM0;
     if(ADC_Value - OFFSET < LOWVOLTAGE * VOLTAGECONVERSION){
+        System_State = Safe;
         LED1OFF
         LED2ON
     }
     else if(ADC_Value - OFFSET > HIGHVOLTAGE * VOLTAGECONVERSION){
-        RTC_Receive_Flag = 1;
+        System_State = Unsafe;
         LED1ON
         LED2OFF
     }
     else{
+        System_State = Warning;
         LED1OFF
         LED2OFF
     }
