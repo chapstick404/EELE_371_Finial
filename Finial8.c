@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------
-// Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
-// expected 50lbs = 2V  0-30lbs = 1.2V
+//  Zachary Elmer and Leah Baker, EELE 371, 12/4/2024
+//  expected 50lbs = 2V  0-30lbs = 1.2V
 //  Safe is less than 35 lbs because 0-30 is normal operating area and being that close to standard is fine
 //  warning is 35-45 lbs because warning shouldn't be too large an area and should warn that one is approaching unsafe
 //  unsafe is 45+ lbs because 50 lbs is the max the drill is expected to withstand, and being that close or higher is dangerous
@@ -12,17 +12,14 @@
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //  For forward set divider to 5 so that 1/10 movement takes half time, 0.02339 seconds
+//
+//  A4 set as P1.4
+//  Precision is 0.00083V
+//  Accuracy is 0.000415V
 //-------------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdint.h>
 #include <msp430.h>
-
-/**
- * Leah Baker, 371, 11/18/2024 main.c
- * A4 set as P1.4
- * Precision is 0.00083V
- * Accuracy is 0.000415V
- */
 
 #define SW1WINT {P4SEL0 &= ~BIT1; \
                 P4SEL1 &= ~BIT1; \
