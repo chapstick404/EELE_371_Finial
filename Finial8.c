@@ -506,7 +506,7 @@ __interrupt void ISR_TB0_CCR0(void){
         }
     }
 
-    if(Move_Forward){
+    else if(Move_Forward){
         P3OUT &= 0;
         State++;
         switch (State) {
