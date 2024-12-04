@@ -86,7 +86,7 @@ uint8_t RTC_Packet[] = {0x03, 0x00, 0x00, 0x12, 0x08, 0x03, 0x11, 0x24}; //Send 
 _Bool RTC_config = 0; //If true the I2C sends the RTC config packet over the I2C bus.
 _Bool Port_expander_config = 0; //If true the I2C sends the port expander config over the bus
 
-int Data_Cnt = 0;
+int I2C_Segment_Count = 0;
 
 // UART and message variables
 char Reverse[] = "\n\r Motor reversed 1 rotation. \r\n\0";
@@ -95,22 +95,22 @@ int Position = 1;
 char Time[100];
 char *Message; //Memory start of message to be sent
 
-char Data_In;
+char Data_In; //Sorting buffer from I2C
 
-uint8_t Seconds_Received; //todo change to a struct
+uint8_t Seconds_Received;
 uint8_t Minutes_Received;
 uint8_t Hours_Received;
 uint8_t Day_Received;
 uint8_t Month_Received;
 
+//ADC variables
 int ADC_Value;
 _Bool ADC_Complete = 0;
-_Bool RTC_Receive_Flag = 0;
 
 // Motor control variables
 _Bool Move_Forward = 0;
 _Bool Move_Reverse = 0;
-int State = 0;
+int Step_Count = 0;
 int Cycle = 0;
 
 void I_O_Init(void){
@@ -251,7 +251,7 @@ void RTC_Config(void){
     UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
     UCB0TBCNT = sizeof(RTC_Packet); //number of bytes in packet
     RTC_config = 1;
-    Data_Cnt = 0;
+    I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}
@@ -261,7 +261,6 @@ void RTC_Config(void){
 void RTC_Receive(void){
     //Receive Data from RTC
 
-    RTC_Receive_Flag = 0;
 
     //Transmit Register Address to RTC
     UCB0TBCNT = 0x01; //Limit to 1 byte transmit
@@ -274,7 +273,7 @@ void RTC_Receive(void){
 
     UCB0CTLW0 &= ~UCTR; //Rx Mode
     UCB0TBCNT = 0x06; //Want only 6 Registers from RTC
-    Data_Cnt = 0;
+    I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}  //Wait until I2C completes
@@ -372,14 +371,14 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
      */
     if(RTC_config){
         //Transmit Config Data to RTC
-        if(Data_Cnt == (sizeof(RTC_Packet)-1)){
-            UCB0TXBUF = RTC_Packet[Data_Cnt];
-            Data_Cnt = 0;
+        if(I2C_Segment_Count == (sizeof(RTC_Packet)-1)){
+            UCB0TXBUF = RTC_Packet[I2C_Segment_Count];
+            I2C_Segment_Count = 0;
             RTC_config = 0;
         }
         else{
-            UCB0TXBUF = RTC_Packet[Data_Cnt];
-            Data_Cnt++;
+            UCB0TXBUF = RTC_Packet[I2C_Segment_Count];
+            I2C_Segment_Count++;
         }
         }
 
@@ -387,7 +386,7 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
         switch(UCB0IV){
             case 0x16:
                 Data_In = UCB0RXBUF;
-                Data_Cnt++;
+                I2C_Segment_Count++;
                 break;
             case 0x18:
                 UCB0TXBUF = 0x03;
@@ -395,7 +394,7 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
             default:
                 break;
         }
-        switch(Data_Cnt){
+        switch(I2C_Segment_Count){
         case 1:
             Seconds_Received = Data_In;
             break;
@@ -429,7 +428,7 @@ __interrupt void ISR_Port4_S1(void){
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
     Move_Forward = 1;
-    State = 0;
+    Step_Count = 0;
     TB0R = 0; //Clear timer count
 
 
@@ -453,7 +452,7 @@ __interrupt void ISR_Port2_S2(void){
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
     Move_Reverse = 1;
-    State = 0;
+    Step_Count = 0;
     TB0R = 0;
 
     //Sends reverse on press
@@ -476,8 +475,8 @@ __interrupt void ISR_TB0_CCR0(void){
 
     if(Move_Reverse){
         P3OUT &= 0;
-        State++;
-        switch (State) {
+        Step_Count++;
+        switch (Step_Count) {
         case 1:
             P3OUT |= BIT1;
             break;
@@ -491,7 +490,7 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            State = 0;
+            Step_Count = 0;
             if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
@@ -508,8 +507,8 @@ __interrupt void ISR_TB0_CCR0(void){
 
     else if(Move_Forward){
         P3OUT &= 0;
-        State++;
-        switch (State) {
+        Step_Count++;
+        switch (Step_Count) {
         case 1:
             P3OUT |= BIT3;
             break;
@@ -523,7 +522,7 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            State = 0;
+            Step_Count = 0;
             if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
                 Move_Forward = 0;
                 Cycle = 0;
