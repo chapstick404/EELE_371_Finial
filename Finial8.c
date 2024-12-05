@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------
-// Zachary Elmer and Leah Baker, EELE 371, 11/21/2024
-// expected 50lbs = 2V  0-30lbs = 1.2V
+//  Zachary Elmer and Leah Baker, EELE 371, 12/4/2024
+//  expected 50lbs = 2V  0-30lbs = 1.2V
 //  Safe is less than 35 lbs because 0-30 is normal operating area and being that close to standard is fine
 //  warning is 35-45 lbs because warning shouldn't be too large an area and should warn that one is approaching unsafe
 //  unsafe is 45+ lbs because 50 lbs is the max the drill is expected to withstand, and being that close or higher is dangerous
@@ -12,17 +12,14 @@
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //  For forward set divider to 5 so that 1/10 movement takes half time, 0.02339 seconds
+//
+//  A4 set as P1.4
+//  Precision is 0.00083V
+//  Accuracy is 0.000415V
 //-------------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdint.h>
 #include <msp430.h>
-
-/**
- * Leah Baker, 371, 11/18/2024 main.c
- * A4 set as P1.4
- * Precision is 0.00083V
- * Accuracy is 0.000415V
- */
 
 #define SW1WINT {P4SEL0 &= ~BIT1; \
                 P4SEL1 &= ~BIT1; \
@@ -93,8 +90,8 @@ _Bool Port_expander_config = 0; //If true the I2C sends the port expander config
 _Bool RTC_select = 0;
 _Bool Port_Expander_Select = 0;
 
-int Data_Cnt = 0;
 int value = 0;
+int I2C_Segment_Count = 0;
 
 // UART and message variables
 char Reverse[] = "\n\r Motor reversed 1 rotation. \r\n\0";
@@ -103,23 +100,23 @@ int Position = 1;
 char Time[100];
 char *Message; //Memory start of message to be sent
 
-char Data_In;
+char Data_In; //Sorting buffer from I2C
 
-uint8_t Seconds_Received; //todo change to a struct
+uint8_t Seconds_Received;
 uint8_t Minutes_Received;
 uint8_t Hours_Received;
 uint8_t Day_Received;
 uint8_t Month_Received;
 
+//ADC variables
 int ADC_Value;
 _Bool ADC_Complete = 0;
-_Bool RTC_Receive_Flag = 0;
 
 
 // Motor control variables
 _Bool Move_Forward = 0;
 _Bool Move_Reverse = 0;
-int State = 0;
+int Step_Count = 0;
 int Cycle = 0;
 
 void I_O_Init(void){
@@ -260,7 +257,7 @@ void RTC_Config(void){
     UCB0I2CSA = 0x0068; //Slave address =0x68 (RTC address)
     UCB0TBCNT = sizeof(RTC_Packet); //number of bytes in packet
     RTC_config = 1;
-    Data_Cnt = 0;
+    I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}
@@ -295,7 +292,7 @@ void RTC_Receive(void){
 
     UCB0CTLW0 &= ~UCTR; //Rx Mode
     UCB0TBCNT = 0x06; //Want only 6 Registers from RTC
-    Data_Cnt = 0;
+    I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}  //Wait until I2C completes
@@ -306,7 +303,7 @@ void RTC_Receive(void){
 
 void Display_Value(void){
     Port_Expander_Select = 1;
-    Data_Cnt = 0;
+    I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTR; //Transmit mode
     UCB0I2CSA = 0x0020; //Slave address =0x20 (Port Expander address)
     UCB0TBCNT = 2; //number of bytes in packet
@@ -378,7 +375,6 @@ int main(void)
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
             //Sends current time when unsafe
-            UCA1IE |= UCTXCPTIE;
             sprintf(Time, "\r\nMonth: %x Day: %x %x hours %x minutes and %x seconds\r\n",
                     Month_Received,
                     Day_Received,
@@ -386,6 +382,7 @@ int main(void)
                     Minutes_Received,
                     Seconds_Received);
             Message = Time;
+            UCA1IE |= UCTXCPTIE;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
         Previous_State = System_State;
@@ -449,27 +446,27 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
      */
     if(RTC_config){
         //Transmit Config Data to RTC
-        if(Data_Cnt == (sizeof(RTC_Packet)-1)){
-            UCB0TXBUF = RTC_Packet[Data_Cnt];
-            Data_Cnt = 0;
+        if(I2C_Segment_Count == (sizeof(RTC_Packet)-1)){
+            UCB0TXBUF = RTC_Packet[I2C_Segment_Count];
+            I2C_Segment_Count = 0;
             RTC_config = 0;
         }
         else{
-            UCB0TXBUF = RTC_Packet[Data_Cnt];
-            Data_Cnt++;
+            UCB0TXBUF = RTC_Packet[I2C_Segment_Count];
+            I2C_Segment_Count++;
         }
     }
 
     if(Port_expander_config){
     //Transmit Config Data to Port Expander
-        if(Data_Cnt == (sizeof(Port_Expander_Packet)-1)){
-            UCB0TXBUF = Port_Expander_Packet[Data_Cnt];
-            Data_Cnt = 0;
+        if(I2C_Segment_Count == (sizeof(Port_Expander_Packet)-1)){
+            UCB0TXBUF = Port_Expander_Packet[I2C_Segment_Count];
+            I2C_Segment_Count = 0;
             Port_expander_config = 0;
         }
         else{
-            UCB0TXBUF = Port_Expander_Packet[Data_Cnt];
-            Data_Cnt++;
+            UCB0TXBUF = Port_Expander_Packet[I2C_Segment_Count];
+            I2C_Segment_Count++;
         }
     }
 
@@ -479,7 +476,7 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
             switch(UCB0IV){
                 case 0x16:
                     Data_In = UCB0RXBUF;
-                    Data_Cnt++;
+                    I2C_Segment_Count++;
                     break;
                 case 0x18:
                     UCB0TXBUF = 0x03;
@@ -487,7 +484,7 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
                 default:
                     break;
             }
-            switch(Data_Cnt){
+            switch(I2C_Segment_Count){
                     case 1:
                         Seconds_Received = Data_In;
                         break;
@@ -508,11 +505,11 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
                     }
         }
         if(Port_Expander_Select){
-            if(Data_Cnt == 0){
+            if(I2C_Segment_Count == 0){
                 UCB0TXBUF = 0x13;
-                Data_Cnt++;
+                I2C_Segment_Count++;
             }
-            else if(Data_Cnt == 1){
+            else if(I2C_Segment_Count == 1){
                 UCB0TXBUF = SegConvert(value);
             }
             //todo send 2 segs
@@ -532,7 +529,7 @@ __interrupt void ISR_Port4_S1(void){
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
     Move_Forward = 1;
-    State = 0;
+    Step_Count = 0;
     TB0R = 0; //Clear timer count
 
 
@@ -556,7 +553,7 @@ __interrupt void ISR_Port2_S2(void){
     // TODO: prevent both interrupts from being active at the same time
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
     Move_Reverse = 1;
-    State = 0;
+    Step_Count = 0;
     TB0R = 0;
 
     //Sends reverse on press
@@ -579,8 +576,8 @@ __interrupt void ISR_TB0_CCR0(void){
 
     if(Move_Reverse){
         P3OUT &= 0;
-        State++;
-        switch (State) {
+        Step_Count++;
+        switch (Step_Count) {
         case 1:
             P3OUT |= BIT1;
             break;
@@ -594,7 +591,7 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            State = 0;
+            Step_Count = 0;
             if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
@@ -609,10 +606,10 @@ __interrupt void ISR_TB0_CCR0(void){
         }
     }
 
-    if(Move_Forward){
+    else if(Move_Forward){
         P3OUT &= 0;
-        State++;
-        switch (State) {
+        Step_Count++;
+        switch (Step_Count) {
         case 1:
             P3OUT |= BIT3;
             break;
@@ -626,7 +623,7 @@ __interrupt void ISR_TB0_CCR0(void){
             break;
         case 4:
             P3OUT |= BIT0;
-            State = 0;
+            Step_Count = 0;
             if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
                 Move_Forward = 0;
                 Cycle = 0;
