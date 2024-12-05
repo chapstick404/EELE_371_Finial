@@ -300,7 +300,6 @@ int main(void)
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
             //Sends current time when unsafe
-            UCA1IE |= UCTXCPTIE;
             sprintf(Time, "\r\nMonth: %x Day: %x %x hours %x minutes and %x seconds\r\n",
                     Month_Received,
                     Day_Received,
@@ -308,6 +307,7 @@ int main(void)
                     Minutes_Received,
                     Seconds_Received);
             Message = Time;
+            UCA1IE |= UCTXCPTIE;
             UCA1TXBUF = Message[0]; //Transmit the start of the message
         }
         Previous_State = System_State;
