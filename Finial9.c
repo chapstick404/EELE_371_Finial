@@ -1,14 +1,14 @@
 //-------------------------------------------------------------------------------
 //  Zachary Elmer and Leah Baker, EELE 371, 12/4/2024
-//  expected 50lbs = 2V  0-30lbs = 1.2V
+//  expected 50lbs = 2V, 2V * 1.5 = 3V  0-30lbs = 1.2V, 1.2V * 1.5 = 1.8V
 //  Safe is less than 35 lbs because 0-30 is normal operating area and being that close to standard is fine
 //  warning is 35-45 lbs because warning shouldn't be too large an area and should warn that one is approaching unsafe
 //  unsafe is 45+ lbs because 50 lbs is the max the drill is expected to withstand, and being that close or higher is dangerous
-//  LOWVOLTAGE = 35lbs = 1400 mV, 
-//  HIGHVOLTAGE = 45lbs = 1800 mV
+//  LOWVOLTAGE = 35lbs = 1400 mV * 1.5 = 2100 mV, 
+//  HIGHVOLTAGE = 45lbs = 1800 mV * 1.5 = 2700 mV,
 //
 //  REVERSE_CYCLE_NUMBER = 128 because 513 is the steps per cycle and 513/4 = 128
-//  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128
+//  FORWARD_CYCLE_NUMBER = 13 because it is roughly 1/10th of 128, (52 steps)
 //  TB0CCR0 = 4678 because the period is supposed to be minimized, the maximum RPM (with good torque) is 25,
 //       and ((25 RPM) * (513 steps/revolution) / (60 s/m))^-1 is 0.004678 seconds per step or 4678 uS per step
 //  For forward set divider to 5 so that 1/10 movement takes half time, 0.02339 seconds
@@ -65,8 +65,8 @@
 //RedLED (LED1) above HIGHVOLTAGE
 //No LED between LOWVOLTAGE and HIGHVOLTAGEs
 //**(THIS IS NOW IN TENTHS OF A VOLT!)**
-#define LOWVOLTAGE 14
-#define HIGHVOLTAGE 18
+#define LOWVOLTAGE 21
+#define HIGHVOLTAGE 27
 
 #define OFFSET 16 //Measured offset at 0v
 
