@@ -547,7 +547,10 @@ __interrupt void ISR_Port4_S1(void){
      * Then start transmit of forward message over UART
      */
     //SW1 ISR
-    // TODO: prevent both interrupts from being active at the same time
+    // prevent both switch interrupts from being active at the same time by disabling during either interrupt
+    P4IES &= ~BIT1;
+    P2IES &= ~BIT3;
+
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
     Move_Forward = 1;
     Step_Count = 0;
@@ -571,7 +574,10 @@ __interrupt void ISR_Port2_S2(void){
      * Then start transmit of reverse message
      */
     //SW2 ISR
-    // TODO: prevent both interrupts from being active at the same time
+    // prevent both switch interrupts from being active at the same time by disabling during either interrupt
+    P4IES &= ~BIT1;
+    P2IES &= ~BIT3;
+
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
     Move_Reverse = 1;
     Step_Count = 0;
@@ -616,6 +622,9 @@ __interrupt void ISR_TB0_CCR0(void){
             if(Cycle == REVERSE_CYCLE_NUMBER -1){ //We have reached the maximum number of cycles, time to end
                 Move_Reverse = 0;
                 Cycle = 0;
+                // re-enable switches
+                P4IES |= BIT1;
+                P2IES |= BIT3;
             }
             else{
                 Cycle++;
@@ -652,6 +661,9 @@ __interrupt void ISR_TB0_CCR0(void){
             else{
                 Cycle++;
             }
+            // re-enable switches
+            P4IES |= BIT1;
+            P2IES |= BIT3;
             break;
         default:
             P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
