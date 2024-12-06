@@ -370,7 +370,7 @@ int main(void)
 
     while(1){
         ADC_Measure();
-        value = (ADC_Value / VOLTAGECONVERSION) % 10 ; //Test code to make sure that it works
+        value = (ADC_Value / (int) ((float) VOLTAGECONVERSION * 1.5)) % 10 ; //Test code to make sure that it works
         Display_Value();
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
