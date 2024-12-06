@@ -548,8 +548,8 @@ __interrupt void ISR_Port4_S1(void){
      */
     //SW1 ISR
     // prevent both switch interrupts from being active at the same time by disabling during either interrupt
-    P4IES &= ~BIT1;
-    P2IES &= ~BIT3;
+    P4IE &= ~BIT1;
+    P2IE &= ~BIT3;
 
     TB0EX0 = TBIDEX__5;         // make divider 5 so that 1/10th of the movement takes 1/2 the time of a full rotation
     Move_Forward = 1;
@@ -575,8 +575,8 @@ __interrupt void ISR_Port2_S2(void){
      */
     //SW2 ISR
     // prevent both switch interrupts from being active at the same time by disabling during either interrupt
-    P4IES &= ~BIT1;
-    P2IES &= ~BIT3;
+    P4IE &= ~BIT1;
+    P2IE &= ~BIT3;
 
     TB0EX0 = TBIDEX__1;         // make sure divider is 1
     Move_Reverse = 1;
@@ -623,8 +623,10 @@ __interrupt void ISR_TB0_CCR0(void){
                 Move_Reverse = 0;
                 Cycle = 0;
                 // re-enable switches
-                P4IES |= BIT1;
-                P2IES |= BIT3;
+                P2IFG &= ~BIT3;
+                P4IFG &= ~BIT1;
+                P4IE |= BIT1;
+                P2IE |= BIT3;
             }
             else{
                 Cycle++;
@@ -657,13 +659,15 @@ __interrupt void ISR_TB0_CCR0(void){
             if(Cycle == FORWARD_CYCLE_NUMBER -1){ //We have reached the maxium number of cylces, time to end
                 Move_Forward = 0;
                 Cycle = 0;
+                P2IFG &= ~BIT3;
+                P4IFG &= ~BIT1;
+                P4IE |= BIT1;
+                P2IE |= BIT3;
             }
             else{
                 Cycle++;
             }
             // re-enable switches
-            P4IES |= BIT1;
-            P2IES |= BIT3;
             break;
         default:
             P3OUT &= 0; //If we end up here just cut all power to the motor, We really shouldnt be here ever
