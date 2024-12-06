@@ -107,6 +107,7 @@ uint8_t Minutes_Received;
 uint8_t Hours_Received;
 uint8_t Day_Received;
 uint8_t Month_Received;
+uint8_t Year_Received;
 
 //ADC variables
 int ADC_Value;
@@ -291,7 +292,7 @@ void RTC_Receive(void){
     UCB0IFG &= ~UCSTPIFG;
 
     UCB0CTLW0 &= ~UCTR; //Rx Mode
-    UCB0TBCNT = 0x06; //Want only 6 Registers from RTC
+    UCB0TBCNT = 0x07; //Want only 7 Registers from RTC
     I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTXSTT; //Start condition
 
@@ -375,9 +376,10 @@ int main(void)
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
             //Sends current time when unsafe
-            sprintf(Time, "\r\nMonth: %x Day: %x %x hours %x minutes and %x seconds\r\n",
+            sprintf(Time, "\r\n%x/%x/%x %x:%x:\r\n",
                     Month_Received,
                     Day_Received,
+                    Year_Received,
                     Hours_Received,
                     Minutes_Received,
                     Seconds_Received);
@@ -502,6 +504,8 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
                     case 6:
                         Month_Received = Data_In;
                         break;
+                    case 7:
+                        Year_Received = Data_In;
                     }
         }
         if(Port_Expander_Select){
