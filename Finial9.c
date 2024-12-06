@@ -90,7 +90,6 @@ _Bool Port_expander_config = 0; //If true the I2C sends the port expander config
 _Bool RTC_select = 0;
 _Bool Port_Expander_Select = 0;
 
-int value = 0;
 int I2C_Segment_Count = 0;
 
 // UART and message variables
@@ -112,6 +111,14 @@ uint8_t Year_Received;
 //ADC variables
 int ADC_Value;
 _Bool ADC_Complete = 0;
+
+//Sensor Reading
+float Sensor_Voltage = 0;
+float Pressure_Reading = 0;
+
+//Display Segements
+uint8_t Seg1 = 1;
+uint8_t Seg2 = 2;
 
 
 // Motor control variables
@@ -307,7 +314,7 @@ void Display_Value(void){
     I2C_Segment_Count = 0;
     UCB0CTLW0 |= UCTR; //Transmit mode
     UCB0I2CSA = 0x0020; //Slave address =0x20 (Port Expander address)
-    UCB0TBCNT = 2; //number of bytes in packet
+    UCB0TBCNT = 3; //number of bytes in packet
     UCB0CTLW0 |= UCTXSTT; // Generate START condition
 
     while ((UCB0IFG & UCSTPIFG) == 0){}
@@ -371,7 +378,11 @@ int main(void)
 
     while(1){
         ADC_Measure();
-        value = (ADC_Value / (int) ((float) VOLTAGECONVERSION * 1.5)) % 10 ; //Test code to make sure that it works
+        Sensor_Voltage = (float) ADC_Value / ((float) VOLTAGECONVERSION * 15); //Convert to incoming voltage
+        Pressure_Reading = Sensor_Voltage * (1/0.04);
+        Seg2 = (int) (Pressure_Reading) % 10;
+        Seg1 = ((int) (Pressure_Reading) - Seg2) / 10;
+
         Display_Value();
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
@@ -509,13 +520,19 @@ __interrupt void EUSCI_B0_I2C_ISR(void){
                     }
         }
         if(Port_Expander_Select){
-            if(I2C_Segment_Count == 0){
+            switch(I2C_Segment_Count){
+            case 0:
                 UCB0TXBUF = 0x13;
-                I2C_Segment_Count++;
+                break;
+
+            case 1:
+                UCB0TXBUF = SegConvert(Seg1);
+                break;
+            case 2:
+                UCB0TXBUF = SegConvert(Seg2);
+                break;
             }
-            else if(I2C_Segment_Count == 1){
-                UCB0TXBUF = SegConvert(value);
-            }
+            I2C_Segment_Count++;
             //todo send 2 segs
         }
     }
