@@ -376,7 +376,7 @@ int main(void)
         if((System_State == Unsafe) && (System_State != Previous_State)){
             RTC_Receive();
             //Sends current time when unsafe
-            sprintf(Time, "\r\n%x/%x/%x %x:%x:\r\n",
+            sprintf(Time, "\r\n%x/%x/%x %x:%x:%x\r\n",
                     Month_Received,
                     Day_Received,
                     Year_Received,
